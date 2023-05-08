@@ -76,10 +76,15 @@ impl Game {
             Ok(i) => i,
             _ => panic!("can't read!"),
         };
-        self.board.fields[index] = Field::Player(self.player_turn);
-        match self.player_turn {
-            Player::X => self.player_turn = Player::Y,
-            Player::Y => self.player_turn = Player::X,
+        match self.board.fields[index] {
+            Field::Player(_) => {},
+            Field::Free => {
+                self.board.fields[index] = Field::Player(self.player_turn);
+                match self.player_turn {
+                    Player::X => self.player_turn = Player::Y,
+                    Player::Y => self.player_turn = Player::X,
+                }
+            }
         }
     }
     fn check_winner(&mut self) {

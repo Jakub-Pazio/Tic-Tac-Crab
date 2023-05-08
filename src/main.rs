@@ -3,7 +3,7 @@ use std::io;
 #[derive(Debug,Clone,Copy)]
 enum Player {
     X,
-    Y,
+    O,
 }
 
 #[derive(Clone,Copy)]
@@ -17,7 +17,7 @@ impl fmt::Debug for Field {
         match self {
             &Field::Player(p) => match p {
                 Player::X => write!(f, "X"),
-                Player::Y => write!(f, "Y"), 
+                Player::O => write!(f, "O"), 
             }
             &Field::Free => write!(f, " "),
         }
@@ -81,8 +81,8 @@ impl Game {
             Field::Free => {
                 self.board.fields[index] = Field::Player(self.player_turn);
                 match self.player_turn {
-                    Player::X => self.player_turn = Player::Y,
-                    Player::Y => self.player_turn = Player::X,
+                    Player::X => self.player_turn = Player::O,
+                    Player::O => self.player_turn = Player::X,
                 }
             }
         }
@@ -104,7 +104,7 @@ impl Game {
             for index in combination {
                 match self.board.fields[index] {
                     Field::Player(Player::X) => player_x += 1,
-                    Field::Player(Player::Y) => player_y += 1,
+                    Field::Player(Player::O) => player_y += 1,
                     _ => continue,
                 }
             }
@@ -113,7 +113,7 @@ impl Game {
                 return;
             }
             if player_y == 3 {
-                self.winner = Some(Player::Y);
+                self.winner = Some(Player::O);
                 return;
             }
         }

@@ -1,5 +1,6 @@
 use core::{panic, fmt};
 use std::io;
+
 #[derive(Debug,Clone,Copy)]
 enum Player {
     X,
@@ -24,15 +25,34 @@ impl fmt::Debug for Field {
     }
 }
 
+#[derive(Clone)]
 struct Board {
-    fields: Vec<Field>
+    fields: Vec<Field>,
+    player_turn: Player,
 }
 
 impl Board {
     fn create_board() -> Self {
         Self {
             fields: vec![Field::Free;9],
+            player_turn: Player::O,
         }
+    }
+
+    fn generate_moves(&self) -> Vec<Self> {
+        let mut result = vec![];
+        for (index, &filed) in self.fields.iter().enumerate() {
+            match filed {
+                Field::Player(_) => {},
+                Field::Free => {
+                    let mut temp = self.clone();
+                    temp.fields[index] = Field::Player(self.player_turn);
+                    result.push(temp);
+                }
+            }
+        }
+
+        return result;
     }
 }
 
@@ -54,7 +74,6 @@ impl fmt::Debug for Board {
 
 struct Game {
     board: Board,
-    player_turn: Player,
     winner: Option<Player>,
 }
 
@@ -62,8 +81,7 @@ impl Game {
     fn new() -> Self {
         Self {
             board: Board::create_board(),
-            player_turn: Player::X,
-            winner: Option::None,
+            winner: None,
         }
     }
 
@@ -79,10 +97,10 @@ impl Game {
         match self.board.fields[index] {
             Field::Player(_) => {},
             Field::Free => {
-                self.board.fields[index] = Field::Player(self.player_turn);
-                match self.player_turn {
-                    Player::X => self.player_turn = Player::O,
-                    Player::O => self.player_turn = Player::X,
+                self.board.fields[index] = Field::Player(self.board.player_turn);
+                match self.board.player_turn {
+                    Player::X => self.board.player_turn = Player::O,
+                    Player::O => self.board.player_turn = Player::X,
                 }
             }
         }
@@ -139,5 +157,8 @@ impl Game {
 
 fn main() {
     let mut game = Game::new();
+    game.make_move();
+    let b1 = game.board.generate_moves();
+    println!("{:?}", b1.len());
     game.play(); 
 }

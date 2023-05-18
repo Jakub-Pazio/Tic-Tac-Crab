@@ -1,5 +1,6 @@
 use core::{panic, fmt};
 use std::io;
+use rand::Rng;
 
 #[derive(Debug,Clone,Copy)]
 enum Player {
@@ -105,6 +106,16 @@ impl Game {
             }
         }
     }
+    fn make_rand_move(&mut self) {
+        let possible_moves = self.board.generate_moves();
+        let rng = rand::thread_rng().gen_range(0..possible_moves.len());
+        self.board = possible_moves[rng].clone();
+        match self.board.player_turn {
+            Player::X => self.board.player_turn = Player::O,
+            Player::O => self.board.player_turn = Player::X,
+        }
+    }
+
     fn check_winner(&mut self) {
         let winner_combinations = vec![
             vec![0,1,2],
@@ -148,7 +159,18 @@ impl Game {
                     println!("Winner is {:?}", winner);
                     break
                 },
-                None => continue
+                None => {}
+            }
+            self.make_rand_move();
+            println!("{:?}", self.board);
+            self.check_winner();
+            match self.winner {
+                Some(_) => {
+                    let winner = self.winner.expect("No winner");
+                    println!("Winner is {:?}", winner);
+                    break
+                },
+                None => {}
             }
         }
     }
@@ -157,8 +179,5 @@ impl Game {
 
 fn main() {
     let mut game = Game::new();
-    game.make_move();
-    let b1 = game.board.generate_moves();
-    println!("{:?}", b1.len());
     game.play(); 
 }

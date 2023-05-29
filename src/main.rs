@@ -340,11 +340,13 @@ fn alpha_beta(board: &mut Board, _depth: u8, alfa: &mut GameResult, beta: &mut G
                         if local_result > best_score {
                             best_score = local_result;
                         }
-                        if *alfa > *beta {
+                        if best_score >= *beta {
                             board.undo_last_move().unwrap();
                             break;
                         }
-                        *alfa = local_result;
+                        if *alfa < best_score {
+                            *alfa = best_score;
+                        }
                         board.undo_last_move().unwrap();
                     }
                     return best_score;
@@ -364,11 +366,13 @@ fn alpha_beta(board: &mut Board, _depth: u8, alfa: &mut GameResult, beta: &mut G
                         if local_result < best_score {
                             best_score = local_result;
                         }
-                        if *beta < *alfa {
+                        if best_score <= *alfa {
                             board.undo_last_move().unwrap();
                             break;
                         }
-                        *beta = local_result;
+                        if *beta > best_score {
+                            *beta = best_score;
+                        }
                         board.undo_last_move().unwrap();
                     }
                     return best_score;

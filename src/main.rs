@@ -218,10 +218,10 @@ impl Board {
         match self.player_turn {
             Player::X => {
                 let mut best_move = self.generate_moves()[0].clone(); // I'll get int at the end!
-                let mut best_move_score = alpha_beta(&mut best_move, 10, Player::O, alfa, beta);
+                let mut best_move_score = alpha_beta(&mut best_move, 10, alfa, beta, Player::O);
                 for legal_board in self.generate_moves() {
-                    if alpha_beta(&mut legal_board.clone(), 10, Player::O, alfa, beta) >= best_move_score {
-                        best_move_score = alpha_beta(&mut legal_board.clone(), 10, Player::O, alfa, beta);
+                    if alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::O) >= best_move_score {
+                        best_move_score = alpha_beta(&mut legal_board.clone(), 10,  alfa, beta, Player::O);
                         best_move = legal_board;
                     }
                 }
@@ -230,10 +230,10 @@ impl Board {
             Player::O => {
                 // Do the same but just flip grater sign i guess ?
                 let mut best_move = self.generate_moves()[0].clone();
-                let mut best_move_score = alpha_beta(&mut best_move, 10, Player::X, alfa, beta);
+                let mut best_move_score = alpha_beta(&mut best_move, 10, alfa, beta, Player::X);
                 for legal_board in self.generate_moves() {
-                    if alpha_beta(&mut legal_board.clone(), 10, Player::X, alfa, beta) <= best_move_score {
-                        best_move_score = alpha_beta(&mut legal_board.clone(), 10, Player::X, alfa, beta);
+                    if alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::X) <= best_move_score {
+                        best_move_score = alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::X);
                         best_move = legal_board;
                     }
                 }
@@ -314,7 +314,7 @@ fn min_max(board: &mut Board, _depth: u8, max_player: Player) -> GameResult {
     }
 }
 // TODO bad implementation btw
-fn alpha_beta(board: &mut Board, depth: u8, max_player: Player, mut alpha: GameResult, mut beta: GameResult) -> GameResult {
+fn alpha_beta(board: &mut Board, _depth: u8, mut alfa: GameResult, mut beta: GameResult, max_player: Player) -> GameResult {
     unsafe {
         A_B_COUNTER += 1;
     }
@@ -334,29 +334,21 @@ fn alpha_beta(board: &mut Board, depth: u8, max_player: Player, mut alpha: GameR
                         .filter(|(_, value)| **value == Field::Free)
                         .map(|(index, _)| index)
                         .collect();
-
+                    //println!("{:?}", possible_moves.len());
                     for legal_move in possible_moves {
                         board.make_move(legal_move as u8).unwrap();
-                        let local_result = alpha_beta(
-                            board,
-                            depth - 1,
-                            board.player_turn,
-                            alpha,
-                            beta,
-                        );
-                        board.undo_last_move().unwrap();
-
+                        let local_result = alpha_beta(board, _depth - 1, alfa, beta, board.player_turn);
                         if local_result > best_score {
                             best_score = local_result;
                         }
-
+                        if alfa < best_score {
+                            alfa = best_score;
+                        }
                         if best_score >= beta {
-                            break; // Beta cutoff
+                            board.undo_last_move().unwrap();
+                            break;
                         }
-
-                        if best_score > alpha {
-                            alpha = best_score; // Update alpha
-                        }
+                        board.undo_last_move().unwrap();
                     }
                     return best_score;
                 }
@@ -369,29 +361,20 @@ fn alpha_beta(board: &mut Board, depth: u8, max_player: Player, mut alpha: GameR
                         .filter(|(_, value)| **value == Field::Free)
                         .map(|(index, _)| index)
                         .collect();
-
                     for legal_move in possible_moves {
                         board.make_move(legal_move as u8).unwrap();
-                        let local_result = alpha_beta(
-                            board,
-                            depth - 1,
-                            board.player_turn,
-                            alpha,
-                            beta,
-                        );
-                        board.undo_last_move().unwrap();
-
+                        let local_result = alpha_beta(board, _depth - 1, alfa, beta, board.player_turn);
                         if local_result < best_score {
                             best_score = local_result;
                         }
-
-                        if best_score <= alpha {
-                            break; // Alpha cutoff
+                        if beta > best_score {
+                            beta = best_score;
                         }
-
-                        if best_score < beta {
-                            beta = best_score; // Update beta
+                        if best_score <= alfa {
+                            board.undo_last_move().unwrap();
+                            break;
                         }
+                        board.undo_last_move().unwrap();
                     }
                     return best_score;
                 }
@@ -545,7 +528,7 @@ fn main() {
     }
     println!("{:?}", first_min_max);
 
-    let first_alfa_beta = alpha_beta(&mut game2.board.clone(), 10, game.board.player_turn, alfa, beta);
+    let first_alfa_beta = alpha_beta(&mut game2.board.clone(), 10, alfa, beta, game.board.player_turn);
     unsafe {
         println!("{:?}", A_B_COUNTER);
     }

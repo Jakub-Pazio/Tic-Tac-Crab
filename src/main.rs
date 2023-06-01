@@ -191,7 +191,7 @@ impl Board {
                 let mut best_move = self.generate_moves()[0].clone(); // I'll get int at the end!
                 let mut best_move_score = min_max(&mut best_move, 10, Player::O);
                 for legal_board in self.generate_moves() {
-                    if min_max(&mut legal_board.clone(), 10, Player::O) >= best_move_score {
+                    if min_max(&mut legal_board.clone(), 10, Player::O) > best_move_score {
                         best_move_score = min_max(&mut legal_board.clone(), 10, Player::O);
                         best_move = legal_board;
                     }
@@ -203,7 +203,7 @@ impl Board {
                 let mut best_move = self.generate_moves()[0].clone();
                 let mut best_move_score = min_max(&mut best_move, 10, Player::X);
                 for legal_board in self.generate_moves() {
-                    if min_max(&mut legal_board.clone(), 10, Player::X) <= best_move_score {
+                    if min_max(&mut legal_board.clone(), 10, Player::X) < best_move_score {
                         best_move_score = min_max(&mut legal_board.clone(), 10, Player::X);
                         best_move = legal_board;
                     }
@@ -220,7 +220,7 @@ impl Board {
                 let mut best_move = self.generate_moves()[0].clone(); // I'll get int at the end!
                 let mut best_move_score = alpha_beta(&mut best_move, 10, alfa, beta, Player::O);
                 for legal_board in self.generate_moves() {
-                    if alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::O) >= best_move_score {
+                    if alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::O) > best_move_score {
                         best_move_score = alpha_beta(&mut legal_board.clone(), 10,  alfa, beta, Player::O);
                         best_move = legal_board;
                     }
@@ -232,13 +232,28 @@ impl Board {
                 let mut best_move = self.generate_moves()[0].clone();
                 let mut best_move_score = alpha_beta(&mut best_move, 10, alfa, beta, Player::X);
                 for legal_board in self.generate_moves() {
-                    if alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::X) <= best_move_score {
+                    if alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::X) < best_move_score {
                         best_move_score = alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::X);
                         best_move = legal_board;
                     }
                 }
                 return *best_move.moves.last().unwrap();
             }
+        }
+    }
+    fn rot90board(&self) -> Self {
+        let mut result_board = vec![Field::Free; 9];
+
+        for i in 0..3 {
+            for j in 0..3 {
+                result_board[j * 3 + (3 - 1 - i)] = self.fields[i * 3 + j];
+            }
+        }
+
+        Board{
+            fields: result_board,
+            moves: self.moves.clone(),
+            player_turn: self.player_turn
         }
     }
 }
@@ -468,6 +483,7 @@ impl Game {
         loop {
             self.human_move();
             println!("{:?}", self.board);
+            println!("{:?}", self.board.rot90board().rot90board());
             self.winner = self.board.get_result();
             match self.winner {
                 GameResult::Player(_) => {
@@ -481,7 +497,7 @@ impl Game {
                 }
                 _ => {}
             }
-            self.make_best_move_a_b();
+            self.human_move();
             println!("{:?}", self.board);
             self.winner = self.board.get_result();
             match self.winner {

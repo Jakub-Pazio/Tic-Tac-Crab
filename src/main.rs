@@ -1,6 +1,7 @@
 use core::{fmt, panic};
 use rand::Rng;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::io;
 
 
@@ -94,19 +95,23 @@ struct Board {
     fields: Vec<Field>,
     player_turn: Player,
     moves: Vec<u8>,
+    size: u32,
 }
 
 impl Board {
-    fn create_board() -> Self {
+    fn create_board(n: u32) -> Self {
         Self {
             fields: vec![Field::Free; 9],
             player_turn: Player::X,
             moves: vec![],
+            size: n,
         }
     }
 
     fn get_result(&self) -> GameResult {
-        let winner_combinations = vec![
+        // TODO:Create this map once when creating game, and pass immutable reference to this fn
+        let mut winner_combinations = HashMap::new();
+        winner_combinations.insert(3,  vec![
             vec![0, 1, 2],
             vec![3, 4, 5],
             vec![6, 7, 8],
@@ -115,21 +120,31 @@ impl Board {
             vec![2, 5, 8],
             vec![0, 4, 8],
             vec![2, 4, 6],
-        ];
-        for combination in winner_combinations {
+        ]);
+        winner_combinations.insert(4,  vec![
+            vec![0, 1, 2],
+            vec![3, 4, 5],
+            vec![6, 7, 8],
+            vec![0, 3, 6],
+            vec![1, 4, 7],
+            vec![2, 5, 8],
+            vec![0, 4, 8],
+            vec![2, 4, 6],
+        ]);
+        for combination in winner_combinations.get(&self.size).unwrap() {
             let mut player_x = 0;
             let mut player_o = 0;
-            for index in combination {
+            for &index in combination {
                 match self.fields[index] {
                     Field::Player(Player::X) => player_x += 1,
                     Field::Player(Player::O) => player_o += 1,
                     _ => continue,
                 }
             }
-            if player_x == 3 {
+            if player_x == self.size {
                 return GameResult::Player(Player::X);
             }
-            if player_o == 3 {
+            if player_o == self.size {
                 return GameResult::Player(Player::O);
             }
         }
@@ -253,7 +268,8 @@ impl Board {
         Board{
             fields: result_board,
             moves: self.moves.clone(),
-            player_turn: self.player_turn
+            player_turn: self.player_turn,
+            size: self.size
         }
     }
 }
@@ -408,7 +424,7 @@ struct Game {
 impl Game {
     fn new() -> Self {
         Self {
-            board: Board::create_board(),
+            board: Board::create_board(3),
             winner: GameResult::InProgress,
         }
     }

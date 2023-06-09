@@ -29,7 +29,7 @@ impl Ord for Player {
 }
 
 impl Player {
-    fn oponent(&self) -> Player {
+    fn opponent(&self) -> Player {
         return match self {
             Player::X => Player::O,
             Player::O => Player::X,
@@ -94,14 +94,14 @@ impl fmt::Debug for Field {
 struct Board {
     fields: Vec<Field>,
     player_turn: Player,
-    moves: Vec<u8>,
+    moves: Vec<u32>,
     size: u32,
 }
 
 impl Board {
     fn create_board(n: u32) -> Self {
         Self {
-            fields: vec![Field::Free; 9],
+            fields: vec![Field::Free; (n*n) as usize],
             player_turn: Player::X,
             moves: vec![],
             size: n,
@@ -111,26 +111,64 @@ impl Board {
     fn get_result(&self) -> GameResult {
         // TODO:Create this map once when creating game, and pass immutable reference to this fn
         let mut winner_combinations = HashMap::new();
+        winner_combinations.insert(2,  vec![
+            // Horizontal lines
+            vec![0, 1],
+            vec![2, 3],
+            // Vertical lines
+            vec![0, 2],
+            vec![1, 3],
+            // Diagonal lines
+            vec![0, 3],
+            vec![1, 2],
+        ]);
         winner_combinations.insert(3,  vec![
+            // Horizontal lines
             vec![0, 1, 2],
             vec![3, 4, 5],
             vec![6, 7, 8],
+            // Vertical lines
             vec![0, 3, 6],
             vec![1, 4, 7],
             vec![2, 5, 8],
+            // Diagonal lines
             vec![0, 4, 8],
             vec![2, 4, 6],
         ]);
         winner_combinations.insert(4,  vec![
-            vec![0, 1, 2],
-            vec![3, 4, 5],
-            vec![6, 7, 8],
-            vec![0, 3, 6],
-            vec![1, 4, 7],
-            vec![2, 5, 8],
-            vec![0, 4, 8],
-            vec![2, 4, 6],
+            // Horizontal lines
+            vec![0, 1, 2, 3],
+            vec![4, 5, 6, 7],
+            vec![8, 9, 10, 11],
+            vec![12, 13, 14, 15],
+            // Vertical lines
+            vec![0, 4, 8, 12],
+            vec![1, 5, 9, 13],
+            vec![2, 6, 10, 14],
+            vec![3, 7, 11, 15],
+            // Diagonal lines
+            vec![0, 5, 10, 15],
+            vec![3, 6, 9, 12],
         ]);
+        winner_combinations.insert(5,  vec![
+            // Horizontal lines
+            vec![0, 1, 2, 3, 4],
+            vec![5, 6, 7, 8, 9],
+            vec![10, 11, 12, 13, 14],
+            vec![15, 16, 17, 18, 19],
+            vec![20, 21, 22, 23, 24],
+            // Vertical lines
+            vec![0, 5, 10, 15, 20],
+            vec![1, 6, 11, 16, 21],
+            vec![2, 7, 12, 17, 22],
+            vec![3, 8, 13, 18, 23],
+            vec![4, 9, 14, 19, 24],
+            // Diagonal lines
+            vec![0, 6, 12, 18, 24],
+            vec![4, 8, 12, 16, 20],
+        ]);
+
+
         for combination in winner_combinations.get(&self.size).unwrap() {
             let mut player_x = 0;
             let mut player_o = 0;
@@ -155,19 +193,20 @@ impl Board {
         return GameResult::Draw;
     }
 
-    fn make_move(&mut self, index: u8) -> Result<(), &'static str> {
-        match index {
-            0..=8 => match self.fields[index as usize] {
+    fn make_move(&mut self, index: u32, len: u32) -> Result<(), &'static str> {
+        if index <= len {
+            match self.fields[index as usize] {
                 Field::Free => {
                     self.fields[index as usize] = Field::Player(self.player_turn);
                     self.moves.push(index);
-                    self.player_turn = self.player_turn.oponent();
+                    self.player_turn = self.player_turn.opponent();
+                    Ok(())
                 }
-                Field::Player(_) => return Err("Field is already taken!"),
-            },
-            _ => return Err("Wrong square number"),
+                Field::Player(_) => Err("Field is already taken!"),
+            }
+        } else {
+            Err("Wrong square number")
         }
-        Ok(())
     }
 
     fn undo_last_move(&mut self) -> Result<(), &'static str> {
@@ -179,7 +218,7 @@ impl Board {
                 panic!("Moves and board were not in sync!");
             }
             self.fields[last_move as usize] = Field::Free;
-            self.player_turn = self.player_turn.oponent();
+            self.player_turn = self.player_turn.opponent();
             return Ok(());
         }
         Err("Something went Wrong")
@@ -192,7 +231,7 @@ impl Board {
                 Field::Player(_) => {}
                 Field::Free => {
                     let mut temp = self.clone();
-                    temp.make_move(index as u8).unwrap();
+                    temp.make_move(index as u32, self.size * self.size).unwrap();
                     result.push(temp);
                 }
             }
@@ -200,7 +239,7 @@ impl Board {
         return result;
     }
 
-    fn find_best_move(&self) -> u8 {
+    fn find_best_move(&self) -> u32 {
         match self.player_turn {
             Player::X => {
                 let mut best_move = self.generate_moves()[0].clone(); // I'll get int at the end!
@@ -227,7 +266,7 @@ impl Board {
             }
         }
     }
-    fn find_best_move_alfa_beta(&self) -> u8 {
+    fn find_best_move_alfa_beta(&self) -> u32 {
         let mut alfa = GameResult::Player(Player::O);
         let mut beta = GameResult::Player(Player::X);
         match self.player_turn {
@@ -257,11 +296,11 @@ impl Board {
         }
     }
     fn rot90board(&self) -> Self {
-        let mut result_board = vec![Field::Free; 9];
+        let mut result_board = vec![Field::Free; (self.size * self.size) as usize];
 
-        for i in 0..3 {
-            for j in 0..3 {
-                result_board[j * 3 + (3 - 1 - i)] = self.fields[i * 3 + j];
+        for i in 0..self.size {
+            for j in 0..self.size {
+                result_board[(j * self.size + (self.size - 1 - i)) as usize] = self.fields[(i * self.size + j) as usize];
             }
         }
 
@@ -277,20 +316,28 @@ impl Board {
 impl fmt::Debug for Board {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (index, field) in self.fields.iter().enumerate() {
-            if index % 3 == 0 {
-                write!(f, "\n------------\n")?;
+            if index % self.size as usize == 0 {
+                write!(f, "\n")?;
+                for _ in 0..self.size {
+                    write!(f, "-----")?;
+                }
+                write!(f, "\n")?;
             }
             write!(f, " {:?} ", field)?;
-            if index % 3 != 2 {
+            if index % self.size as usize != (self.size as usize) - 1 {
                 write!(f, " |").expect("bad");
             }
         }
-        write!(f, "\n------------\n")?;
+        write!(f, "\n")?;
+        for _ in 0..self.size {
+            write!(f, "-----")?;
+        }
+        write!(f, "\n")?;
         Ok(())
     }
 }
 
-fn min_max(board: &mut Board, _depth: u8, max_player: Player) -> GameResult {
+fn min_max(board: &mut Board, _depth: i16, max_player: Player) -> GameResult {
     unsafe {
       COUNTER += 1;
     }
@@ -312,7 +359,7 @@ fn min_max(board: &mut Board, _depth: u8, max_player: Player) -> GameResult {
                         .collect();
                     //println!("{:?}", possible_moves.len());
                     for legal_move in possible_moves {
-                        board.make_move(legal_move as u8).unwrap();
+                        board.make_move(legal_move as u32, board.size * board.size).unwrap();
                         let local_result = min_max(board, _depth - 1, board.player_turn);
                         if local_result > best_score {
                             best_score = local_result;
@@ -331,7 +378,7 @@ fn min_max(board: &mut Board, _depth: u8, max_player: Player) -> GameResult {
                         .map(|(index, _)| index)
                         .collect();
                     for legal_move in possible_moves {
-                        board.make_move(legal_move as u8).unwrap();
+                        board.make_move(legal_move as u32, board.size * board.size).unwrap();
                         let local_result = min_max(board, _depth - 1, board.player_turn);
                         if local_result < best_score {
                             best_score = local_result;
@@ -345,7 +392,7 @@ fn min_max(board: &mut Board, _depth: u8, max_player: Player) -> GameResult {
     }
 }
 // TODO bad implementation btw
-fn alpha_beta(board: &mut Board, _depth: u8, mut alfa: GameResult, mut beta: GameResult, max_player: Player) -> GameResult {
+fn alpha_beta(board: &mut Board, _depth: i8, mut alfa: GameResult, mut beta: GameResult, max_player: Player) -> GameResult {
     unsafe {
         A_B_COUNTER += 1;
     }
@@ -367,7 +414,7 @@ fn alpha_beta(board: &mut Board, _depth: u8, mut alfa: GameResult, mut beta: Gam
                         .collect();
                     //println!("{:?}", possible_moves.len());
                     for legal_move in possible_moves {
-                        board.make_move(legal_move as u8).unwrap();
+                        board.make_move(legal_move as u32, board.size * board.size).unwrap();
                         let local_result = alpha_beta(board, _depth - 1, alfa, beta, board.player_turn);
                         if local_result > best_score {
                             best_score = local_result;
@@ -393,7 +440,7 @@ fn alpha_beta(board: &mut Board, _depth: u8, mut alfa: GameResult, mut beta: Gam
                         .map(|(index, _)| index)
                         .collect();
                     for legal_move in possible_moves {
-                        board.make_move(legal_move as u8).unwrap();
+                        board.make_move(legal_move as u32, board.size * board.size).unwrap();
                         let local_result = alpha_beta(board, _depth - 1, alfa, beta, board.player_turn);
                         if local_result < best_score {
                             best_score = local_result;
@@ -422,9 +469,9 @@ struct Game {
 }
 
 impl Game {
-    fn new() -> Self {
+    fn new(n: u32) -> Self {
         Self {
-            board: Board::create_board(3),
+            board: Board::create_board(n),
             winner: GameResult::InProgress,
         }
     }
@@ -442,7 +489,7 @@ impl Game {
             .read_line(&mut user_move)
             .expect("Failed to read input");
         let index = user_move.trim_end().parse::<usize>().unwrap();
-        self.board.make_move(index as u8).unwrap();
+        self.board.make_move(index as u32, self.board.size * self.board.size).unwrap();
     }
     fn make_rand_move(&mut self) {
         let possible_moves: Vec<usize> = self
@@ -456,44 +503,15 @@ impl Game {
         let rng = rand::thread_rng().gen_range(0..possible_moves.len());
         let rng_move = possible_moves[rng];
         print!("{:?}", possible_moves.len());
-        self.board.make_move(rng_move as u8).unwrap();
+        self.board.make_move(rng_move as u32, self.board.size * self.board.size).unwrap();
     }
 
     fn make_best_move(&mut self) {
-        self.board.make_move(self.board.find_best_move()).unwrap();
+        self.board.make_move(self.board.find_best_move(), self.board.size * self.board.size).unwrap();
     }
     fn make_best_move_a_b(&mut self) {
-        self.board.make_move(self.board.find_best_move_alfa_beta()).unwrap();
+        self.board.make_move(self.board.find_best_move_alfa_beta(), self.board.size * self.board.size).unwrap();
     }
-
-    // fn make_best_move(&mut self) {
-    //     !todo!();
-    // }
-    // fn make_best_move(&mut self) {
-    //     let max_player = self.board.player_turn;
-    //     let mut best_result = GameResult::InProgress;
-    //     let mut best_move = None;
-
-    //     for possible_move in self.board.generate_moves() {
-    //         let new_game = Game {
-    //             board: possible_move.clone(),
-    //             winner: GameResult::InProgress,
-    //         };
-    //let result = min_max(&new_game.board, 8, max_player);
-
-    // if best_result <= result {
-    //     best_result = result;
-    //     best_move = Some(possible_move);
-    // }
-    // }
-
-    // if let Some(mv) = best_move {
-    //     self.board = mv;
-    //     self.next_player();
-    // } else {
-    //     panic!("No valid move found!");
-    // }
-    // }
 
     fn play(&mut self) {
         loop {
@@ -549,22 +567,22 @@ fn main() {
     assert!(GameResult::Player(Player::O) < GameResult::InProgress);
     assert_ne!(GameResult::InProgress > GameResult::Draw, true);
     assert_ne!(GameResult::InProgress < GameResult::Draw, true);
-    let mut game = Game::new();
-    let game2 = Game::new();
+    let mut game = Game::new(4);
+    // let game2 = Game::new(3);
     let alfa = GameResult::Player(Player::O);
     let beta = GameResult::Player(Player::X);
-
-    let first_min_max = min_max(&mut game.board.clone(), 10, game.board.player_turn);
-    unsafe {
-        println!("{:?}", COUNTER);
-    }
-    println!("{:?}", first_min_max);
-
-    let first_alfa_beta = alpha_beta(&mut game2.board.clone(), 10, alfa, beta, game.board.player_turn);
+    //
+    let first_min_max = alpha_beta(&mut game.board.clone(), 10, alfa, beta, game.board.player_turn);
     unsafe {
         println!("{:?}", A_B_COUNTER);
     }
-    println!("{:?}", first_alfa_beta);
+    println!("{:?}", first_min_max);
+
+    // let first_alfa_beta = alpha_beta(&mut game2.board.clone(), 10, alfa, beta, game.board.player_turn);
+    // unsafe {
+    //     println!("{:?}", A_B_COUNTER);
+    // }
+    // println!("{:?}", first_alfa_beta);
 
     game.play();
 }

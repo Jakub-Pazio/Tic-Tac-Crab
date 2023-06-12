@@ -509,6 +509,79 @@ fn alpha_beta(board: &mut Board, _depth: i8, mut alfa: GameResult, mut beta: Gam
     }
 }
 
+fn alpha_beta_h1(board: &mut Board, _depth: i8, mut alfa: GameResult, mut beta: GameResult, max_player: Player) -> SearchStats {
+    let start_time = Instant::now();
+    unsafe {
+        A_B_COUNTER_H1 += 1;
+    }
+    let result = board.get_result();
+    match result {
+        GameResult::Draw => SearchStats {
+            result: result,
+            visited: 10,
+            time: start_time.elapsed(),
+        },
+        GameResult::Player(_) => SearchStats {
+            result: result,
+            visited: 10,
+            time: start_time.elapsed(),
+        },
+        GameResult::InProgress => {
+            match max_player {
+                Player::X => {
+                    // We want to maximize the score
+                    let mut best_score = GameResult::Player(Player::O);
+                    let possible_moves = board.generate_sorted_lines_heuristic();
+                    for legal_move in possible_moves {
+                        board.make_move(*legal_move.moves.last().unwrap() as u32, board.size * board.size).unwrap();
+                        let local_result = alpha_beta_h1(board, _depth - 1, alfa, beta, board.player_turn);
+                        if local_result.result > best_score {
+                            best_score = local_result.result;
+                        }
+                        if alfa < best_score {
+                            alfa = best_score;
+                        }
+                        if best_score >= beta {
+                            board.undo_last_move().unwrap();
+                            break;
+                        }
+                        board.undo_last_move().unwrap();
+                    }
+                    return SearchStats {
+                        result: best_score,
+                        visited: 10,
+                        time: start_time.elapsed(),
+                    };
+                }
+                Player::O => {
+                    let mut best_score = GameResult::Player(Player::X);
+                    let possible_moves = board.generate_sorted_lines_heuristic();
+                    for legal_move in possible_moves {
+                        board.make_move(*legal_move.moves.last().unwrap() as u32, board.size * board.size).unwrap();
+                        let local_result = alpha_beta_h1(board, _depth - 1, alfa, beta, board.player_turn);
+                        if local_result.result < best_score {
+                            best_score = local_result.result;
+                        }
+                        if beta > best_score {
+                            beta = best_score;
+                        }
+                        if best_score <= alfa {
+                            board.undo_last_move().unwrap();
+                            break;
+                        }
+                        board.undo_last_move().unwrap();
+                    }
+                    return SearchStats {
+                        result: best_score,
+                        visited: 10,
+                        time: start_time.elapsed(),
+                    };
+                }
+            }
+        }
+    }
+}
+
 fn alpha_beta_lookup(board: &mut Board, _depth: i8, mut alfa: GameResult, mut beta: GameResult, max_player: Player, look_up: &mut HashMap<Board, GameResult>) -> SearchStats {
     let start_time = Instant::now();
     match look_up.get(board) {
@@ -1009,6 +1082,7 @@ impl Game {
 
 static mut COUNTER: i32 = 0;
 static mut A_B_COUNTER: i32 = 0;
+static mut A_B_COUNTER_H1: i32 = 0;
 static mut COUNTERLOOK: i32 = 0;
 static mut A_B_LOOK_UP: i32 = 0;
 static mut A_B_LOOK_UP_SYM: i32 = 0;
@@ -1058,6 +1132,20 @@ fn main() {
 
     unsafe {
         println!("{:?}", A_B_COUNTER);
+
+    }
+
+    let alfa1 = GameResult::Player(Player::O);
+    let beta1 = GameResult::Player(Player::X);
+    let first_alfa_beta_h1 = alpha_beta_h1(&mut game1.board.clone(), 10, alfa1, beta1, game.board.player_turn);
+
+    println!("ABH1:");
+
+    println!("{:?}", first_alfa_beta_h1.result);
+    println!("{:?}", first_alfa_beta_h1.time);
+
+    unsafe {
+        println!("{:?}", A_B_COUNTER_H1);
     }
 
     println!("AB Lookup:");

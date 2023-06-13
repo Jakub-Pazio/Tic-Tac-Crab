@@ -258,6 +258,23 @@ impl Board {
             vec![0, 5, 10, 15],
             vec![3, 6, 9, 12],
         ]);
+        winner_combinations.insert(5,  vec![
+            // Horizontal lines
+            vec![0, 1, 2, 3, 4],
+            vec![5, 6, 7, 8, 9],
+            vec![10, 11, 12, 13, 14],
+            vec![15, 16, 17, 18, 19],
+            vec![20, 21, 22, 23, 24],
+            // Vertical lines
+            vec![0, 5, 10, 15, 20],
+            vec![1, 6, 11, 16, 21],
+            vec![2, 7, 12, 17, 22],
+            vec![3, 8, 13, 18, 23],
+            vec![4, 9, 14, 19, 24],
+            // Diagonal lines
+            vec![0, 6, 12, 18, 24],
+            vec![4, 8, 12, 16, 20],
+        ]);
         let mut p_possible_wins: i32 = self.size as i32 * 2 + 2;
         let mut o_possible_wins: i32 = self.size as i32 * 2 + 2;
 
@@ -276,69 +293,93 @@ impl Board {
     fn better_heuristic(&self, player: Player) -> i32 {
         let mut result = 0;
 
-        let mut winner_combinations = HashMap::new();
-        winner_combinations.insert(2,  vec![
-            // Horizontal lines
-            vec![0, 1],
-            vec![2, 3],
-            // Vertical lines
-            vec![0, 2],
-            vec![1, 3],
-            // Diagonal lines
-            vec![0, 3],
-            vec![1, 2],
-        ]);
-        winner_combinations.insert(3,  vec![
-            // Horizontal lines
-            vec![0, 1, 2],
-            vec![3, 4, 5],
-            vec![6, 7, 8],
-            // Vertical lines
-            vec![0, 3, 6],
-            vec![1, 4, 7],
-            vec![2, 5, 8],
-            // Diagonal lines
-            vec![0, 4, 8],
-            vec![2, 4, 6],
-        ]);
-        winner_combinations.insert(4,  vec![
-            // Horizontal lines
-            vec![0, 1, 2, 3],
-            vec![4, 5, 6, 7],
-            vec![8, 9, 10, 11],
-            vec![12, 13, 14, 15],
-            // Vertical lines
-            vec![0, 4, 8, 12],
-            vec![1, 5, 9, 13],
-            vec![2, 6, 10, 14],
-            vec![3, 7, 11, 15],
-            // Diagonal lines
-            vec![0, 5, 10, 15],
-            vec![3, 6, 9, 12],
-        ]);
-
-        for combination in winner_combinations.get(&self.size).unwrap() {
-            let mut player_x = 0;
-            let mut player_o = 0;
-            for &index in combination {
-                match self.fields[index] {
-                    Field::Player(Player::X) => player_x += 1,
-                    Field::Player(Player::O) => player_o += 1,
-                    _ => continue,
-                }
-            }
-            if player_x == self.size - 1 {
-                match player {
-                    Player::X => result += 5,
-                    Player::O => result -= 100,
-                }
-            }
-            if player_o == self.size - 1 {
-                match player {
-                    Player::X => result -= 100,
-                    Player::O => result += 5,
-                }
-            }
+        // let mut winner_combinations = HashMap::new();
+        // winner_combinations.insert(2,  vec![
+        //     // Horizontal lines
+        //     vec![0, 1],
+        //     vec![2, 3],
+        //     // Vertical lines
+        //     vec![0, 2],
+        //     vec![1, 3],
+        //     // Diagonal lines
+        //     vec![0, 3],
+        //     vec![1, 2],
+        // ]);
+        // winner_combinations.insert(3,  vec![
+        //     // Horizontal lines
+        //     vec![0, 1, 2],
+        //     vec![3, 4, 5],
+        //     vec![6, 7, 8],
+        //     // Vertical lines
+        //     vec![0, 3, 6],
+        //     vec![1, 4, 7],
+        //     vec![2, 5, 8],
+        //     // Diagonal lines
+        //     vec![0, 4, 8],
+        //     vec![2, 4, 6],
+        // ]);
+        // winner_combinations.insert(4,  vec![
+        //     // Horizontal lines
+        //     vec![0, 1, 2, 3],
+        //     vec![4, 5, 6, 7],
+        //     vec![8, 9, 10, 11],
+        //     vec![12, 13, 14, 15],
+        //     // Vertical lines
+        //     vec![0, 4, 8, 12],
+        //     vec![1, 5, 9, 13],
+        //     vec![2, 6, 10, 14],
+        //     vec![3, 7, 11, 15],
+        //     // Diagonal lines
+        //     vec![0, 5, 10, 15],
+        //     vec![3, 6, 9, 12],
+        // ]);
+        //
+        // for combination in winner_combinations.get(&self.size).unwrap() {
+        //     let mut player_x = 0;
+        //     let mut player_o = 0;
+        //     for &index in combination {
+        //         match self.fields[index] {
+        //             Field::Player(Player::X) => player_x += 1,
+        //             Field::Player(Player::O) => player_o += 1,
+        //             _ => continue,
+        //         }
+        //     }
+        //     if player_x == self.size - 1 {
+        //         match player {
+        //             Player::X => result += 5,
+        //             Player::O => result -= 100,
+        //         }
+        //     }
+        //     if player_o == self.size - 1 {
+        //         match player {
+        //             Player::X => result -= 100,
+        //             Player::O => result += 5,
+        //         }
+        //     }
+        // }
+        match self.size {
+            3 => {
+                // Middle
+                if self.fields[4] == Field::Player(player) { result += 3; };
+                // Edges
+                if self.fields[0] == Field::Player(player) { result += 0; };
+                if self.fields[6] == Field::Player(player) { result += 2; };
+                if self.fields[8] == Field::Player(player) { result += 6; };
+                if self.fields[4] == Field::Player(player) { result += 8; };
+            },
+            4 => {
+                // Middle
+                if self.fields[4] == Field::Player(player) { result += 5; };
+                if self.fields[4] == Field::Player(player) { result += 6; };
+                if self.fields[4] == Field::Player(player) { result += 9; };
+                if self.fields[4] == Field::Player(player) { result += 10; };
+                // Edges
+                if self.fields[0] == Field::Player(player) { result += 0; };
+                if self.fields[6] == Field::Player(player) { result += 3; };
+                if self.fields[8] == Field::Player(player) { result += 12; };
+                if self.fields[4] == Field::Player(player) { result += 15; };
+            },
+            _ => {},
         }
 
         result
@@ -1436,6 +1477,7 @@ fn main() {
     let game1 = Game::new(3);
     let game2 = Game::new(4);
     let game3 = Game::new(3);
+    let game4 = Game::new(5);
     let alfa = GameResult::Player(Player::O);
     let beta = GameResult::Player(Player::X);
 
@@ -1510,7 +1552,7 @@ fn main() {
     }
 
     println!("AB Lookup Sym h1:");
-    let first_look_ab_sym_h1 = alpha_beta_lookup_sym_h1(&mut game2.board.clone(), 10, alfa, beta, game.board.player_turn, &mut look_up_ab_sym.clone());
+    let first_look_ab_sym_h1 = alpha_beta_lookup_sym_h1(&mut game4.board.clone(), 10, alfa, beta, game.board.player_turn, &mut look_up_ab_sym.clone());
 
     println!("{:?}", first_look_ab_sym_h1.result);
     println!("{:?}", first_look_ab_sym_h1.time);

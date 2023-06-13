@@ -272,6 +272,77 @@ impl Board {
 
         p_possible_wins - o_possible_wins
     }
+    // TODO: There is bug to fix
+    fn better_heuristic(&self, player: Player) -> i32 {
+        let mut result = 0;
+
+        let mut winner_combinations = HashMap::new();
+        winner_combinations.insert(2,  vec![
+            // Horizontal lines
+            vec![0, 1],
+            vec![2, 3],
+            // Vertical lines
+            vec![0, 2],
+            vec![1, 3],
+            // Diagonal lines
+            vec![0, 3],
+            vec![1, 2],
+        ]);
+        winner_combinations.insert(3,  vec![
+            // Horizontal lines
+            vec![0, 1, 2],
+            vec![3, 4, 5],
+            vec![6, 7, 8],
+            // Vertical lines
+            vec![0, 3, 6],
+            vec![1, 4, 7],
+            vec![2, 5, 8],
+            // Diagonal lines
+            vec![0, 4, 8],
+            vec![2, 4, 6],
+        ]);
+        winner_combinations.insert(4,  vec![
+            // Horizontal lines
+            vec![0, 1, 2, 3],
+            vec![4, 5, 6, 7],
+            vec![8, 9, 10, 11],
+            vec![12, 13, 14, 15],
+            // Vertical lines
+            vec![0, 4, 8, 12],
+            vec![1, 5, 9, 13],
+            vec![2, 6, 10, 14],
+            vec![3, 7, 11, 15],
+            // Diagonal lines
+            vec![0, 5, 10, 15],
+            vec![3, 6, 9, 12],
+        ]);
+
+        for combination in winner_combinations.get(&self.size).unwrap() {
+            let mut player_x = 0;
+            let mut player_o = 0;
+            for &index in combination {
+                match self.fields[index] {
+                    Field::Player(Player::X) => player_x += 1,
+                    Field::Player(Player::O) => player_o += 1,
+                    _ => continue,
+                }
+            }
+            if player_x == self.size - 1 {
+                match player {
+                    Player::X => result += 5,
+                    Player::O => result -= 100,
+                }
+            }
+            if player_o == self.size - 1 {
+                match player {
+                    Player::X => result -= 100,
+                    Player::O => result += 5,
+                }
+            }
+        }
+
+        result
+    }
 
     fn make_move(&mut self, index: u32, len: u32) -> Result<(), &'static str> {
         if index <= len {
@@ -321,6 +392,12 @@ impl Board {
     fn generate_sorted_lines_heuristic(&self) -> Vec<Self> {
         let mut res = self.generate_moves();
         res.sort_by_key(|b| std::cmp::Reverse(b.lines_heuristic(self.player_turn)));
+        res
+    }
+
+    fn generate_own_heuristic(&self) -> Vec<Self> {
+        let mut res = self.generate_moves();
+        res.sort_by_key(|b| std::cmp::Reverse(b.better_heuristic(self.player_turn)));
         res
     }
 
@@ -582,6 +659,79 @@ fn alpha_beta_h1(board: &mut Board, _depth: i8, mut alfa: GameResult, mut beta: 
     }
 }
 
+fn alpha_beta_h2(board: &mut Board, _depth: i8, mut alfa: GameResult, mut beta: GameResult, max_player: Player) -> SearchStats {
+    let start_time = Instant::now();
+    unsafe {
+        A_B_H2 += 1;
+    }
+    let result = board.get_result();
+    match result {
+        GameResult::Draw => SearchStats {
+            result: result,
+            visited: 10,
+            time: start_time.elapsed(),
+        },
+        GameResult::Player(_) => SearchStats {
+            result: result,
+            visited: 10,
+            time: start_time.elapsed(),
+        },
+        GameResult::InProgress => {
+            match max_player {
+                Player::X => {
+                    // We want to maximize the score
+                    let mut best_score = GameResult::Player(Player::O);
+                    let possible_moves = board.generate_own_heuristic();
+                    for legal_move in possible_moves {
+                        board.make_move(*legal_move.moves.last().unwrap() as u32, board.size * board.size).unwrap();
+                        let local_result = alpha_beta_h2(board, _depth - 1, alfa, beta, board.player_turn);
+                        if local_result.result > best_score {
+                            best_score = local_result.result;
+                        }
+                        if alfa < best_score {
+                            alfa = best_score;
+                        }
+                        if best_score >= beta {
+                            board.undo_last_move().unwrap();
+                            break;
+                        }
+                        board.undo_last_move().unwrap();
+                    }
+                    return SearchStats {
+                        result: best_score,
+                        visited: 10,
+                        time: start_time.elapsed(),
+                    };
+                }
+                Player::O => {
+                    let mut best_score = GameResult::Player(Player::X);
+                    let possible_moves = board.generate_own_heuristic();
+                    for legal_move in possible_moves {
+                        board.make_move(*legal_move.moves.last().unwrap() as u32, board.size * board.size).unwrap();
+                        let local_result = alpha_beta_h2(board, _depth - 1, alfa, beta, board.player_turn);
+                        if local_result.result < best_score {
+                            best_score = local_result.result;
+                        }
+                        if beta > best_score {
+                            beta = best_score;
+                        }
+                        if best_score <= alfa {
+                            board.undo_last_move().unwrap();
+                            break;
+                        }
+                        board.undo_last_move().unwrap();
+                    }
+                    return SearchStats {
+                        result: best_score,
+                        visited: 10,
+                        time: start_time.elapsed(),
+                    };
+                }
+            }
+        }
+    }
+}
+
 fn alpha_beta_lookup(board: &mut Board, _depth: i8, mut alfa: GameResult, mut beta: GameResult, max_player: Player, look_up: &mut HashMap<Board, GameResult>) -> SearchStats {
     let start_time = Instant::now();
     match look_up.get(board) {
@@ -790,6 +940,188 @@ fn alpha_beta_lookup_sym(board: &mut Board, _depth: i8, mut alfa: GameResult, mu
                             for legal_move in possible_moves {
                                 board.make_move(legal_move as u32, board.size * board.size).unwrap();
                                 let local_result = alpha_beta_lookup_sym(board, _depth - 1, alfa, beta, board.player_turn, look_up);
+                                if local_result.result < best_score {
+                                    best_score = local_result.result;
+                                }
+                                if beta > best_score {
+                                    beta = best_score;
+                                }
+                                if best_score <= alfa {
+                                    board.undo_last_move().unwrap();
+                                    break;
+                                }
+                                board.undo_last_move().unwrap();
+                            }
+                            look_up.insert(board.clone(), best_score);
+                            return SearchStats {
+                                result: best_score,
+                                visited: 10,
+                                time: start_time.elapsed(),
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn alpha_beta_lookup_sym_h1(board: &mut Board, _depth: i8, mut alfa: GameResult, mut beta: GameResult, max_player: Player, look_up: &mut HashMap<Board, GameResult>) -> SearchStats {
+    let start_time = Instant::now();
+    let lookup_result = check_for_rotation(&mut board.clone(), look_up);
+    match lookup_result {
+        Some(res) => SearchStats {
+            result: res,
+            visited: 10,
+            time: start_time.elapsed()
+        },
+        _ => {
+            unsafe {
+                A_B_LOOK_UP_SYM_H1 += 1;
+            }
+            let result = board.get_result();
+            match result {
+                GameResult::Draw => {
+                    look_up.insert(board.clone(), result);
+                    SearchStats {
+                        result: result,
+                        visited: 10,
+                        time: start_time.elapsed(),
+                    }
+                },
+                GameResult::Player(_) => {
+                    look_up.insert(board.clone(), result);
+                    SearchStats {
+                        result: result,
+                        visited: 10,
+                        time: start_time.elapsed(),
+                    }
+                },
+                GameResult::InProgress => {
+                    match max_player {
+                        Player::X => {
+                            // We want to maximize the score
+                            let mut best_score = GameResult::Player(Player::O);
+                            let possible_moves = board.generate_sorted_lines_heuristic();
+                            //println!("{:?}", possible_moves.len());
+                            for legal_move in possible_moves {
+                                board.make_move(*legal_move.moves.last().unwrap(), board.size * board.size).unwrap();
+                                let local_result = alpha_beta_lookup_sym_h1(board, _depth - 1, alfa, beta, board.player_turn, look_up);
+                                if local_result.result > best_score {
+                                    best_score = local_result.result;
+                                }
+                                if alfa < best_score {
+                                    alfa = best_score;
+                                }
+                                if best_score >= beta {
+                                    board.undo_last_move().unwrap();
+                                    break;
+                                }
+                                board.undo_last_move().unwrap();
+                            }
+                            return SearchStats {
+                                result: best_score,
+                                visited: 10,
+                                time: start_time.elapsed(),
+                            };
+                        }
+                        Player::O => {
+                            let mut best_score = GameResult::Player(Player::X);
+                            let possible_moves = board.generate_sorted_lines_heuristic();
+                            for legal_move in possible_moves {
+                                board.make_move(*legal_move.moves.last().unwrap() as u32, board.size * board.size).unwrap();
+                                let local_result = alpha_beta_lookup_sym_h1(board, _depth - 1, alfa, beta, board.player_turn, look_up);
+                                if local_result.result < best_score {
+                                    best_score = local_result.result;
+                                }
+                                if beta > best_score {
+                                    beta = best_score;
+                                }
+                                if best_score <= alfa {
+                                    board.undo_last_move().unwrap();
+                                    break;
+                                }
+                                board.undo_last_move().unwrap();
+                            }
+                            look_up.insert(board.clone(), best_score);
+                            return SearchStats {
+                                result: best_score,
+                                visited: 10,
+                                time: start_time.elapsed(),
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn alpha_beta_lookup_sym_h2(board: &mut Board, _depth: i8, mut alfa: GameResult, mut beta: GameResult, max_player: Player, look_up: &mut HashMap<Board, GameResult>) -> SearchStats {
+    let start_time = Instant::now();
+    let lookup_result = check_for_rotation(&mut board.clone(), look_up);
+    match lookup_result {
+        Some(res) => SearchStats {
+            result: res,
+            visited: 10,
+            time: start_time.elapsed()
+        },
+        _ => {
+            unsafe {
+                A_B_LOOK_UP_SYM_H2 += 1;
+            }
+            let result = board.get_result();
+            match result {
+                GameResult::Draw => {
+                    look_up.insert(board.clone(), result);
+                    SearchStats {
+                        result: result,
+                        visited: 10,
+                        time: start_time.elapsed(),
+                    }
+                },
+                GameResult::Player(_) => {
+                    look_up.insert(board.clone(), result);
+                    SearchStats {
+                        result: result,
+                        visited: 10,
+                        time: start_time.elapsed(),
+                    }
+                },
+                GameResult::InProgress => {
+                    match max_player {
+                        Player::X => {
+                            // We want to maximize the score
+                            let mut best_score = GameResult::Player(Player::O);
+                            let possible_moves = board.generate_own_heuristic();
+                            //println!("{:?}", possible_moves.len());
+                            for legal_move in possible_moves {
+                                board.make_move(*legal_move.moves.last().unwrap(), board.size * board.size).unwrap();
+                                let local_result = alpha_beta_lookup_sym_h2(board, _depth - 1, alfa, beta, board.player_turn, look_up);
+                                if local_result.result > best_score {
+                                    best_score = local_result.result;
+                                }
+                                if alfa < best_score {
+                                    alfa = best_score;
+                                }
+                                if best_score >= beta {
+                                    board.undo_last_move().unwrap();
+                                    break;
+                                }
+                                board.undo_last_move().unwrap();
+                            }
+                            return SearchStats {
+                                result: best_score,
+                                visited: 10,
+                                time: start_time.elapsed(),
+                            };
+                        }
+                        Player::O => {
+                            let mut best_score = GameResult::Player(Player::X);
+                            let possible_moves = board.generate_own_heuristic();
+                            for legal_move in possible_moves {
+                                board.make_move(*legal_move.moves.last().unwrap() as u32, board.size * board.size).unwrap();
+                                let local_result = alpha_beta_lookup_sym_h2(board, _depth - 1, alfa, beta, board.player_turn, look_up);
                                 if local_result.result < best_score {
                                     best_score = local_result.result;
                                 }
@@ -1041,7 +1373,7 @@ impl Game {
             self.human_move();
             println!("{:?}", self.board);
             println!("{:?}", self.board.lines_heuristic(Player::X));
-            //println!("{:?}", self.board.rot90board().rot90board());
+            println!("{:?}", self.board.better_heuristic(Player::X));
             self.winner = self.board.get_result();
             match self.winner {
                 GameResult::Player(_) => {
@@ -1055,7 +1387,7 @@ impl Game {
                 }
                 _ => {}
             }
-            println!("{:?}", self.board.generate_sorted_lines_heuristic());
+            //println!("{:?}", self.board.generate_sorted_lines_heuristic());
             self.human_move();
             println!("{:?}", self.board);
             println!("{:?}", self.board.lines_heuristic(Player::O));
@@ -1085,7 +1417,10 @@ static mut A_B_COUNTER: i32 = 0;
 static mut A_B_COUNTER_H1: i32 = 0;
 static mut COUNTERLOOK: i32 = 0;
 static mut A_B_LOOK_UP: i32 = 0;
+static mut A_B_H2: i32 = 0;
 static mut A_B_LOOK_UP_SYM: i32 = 0;
+static mut A_B_LOOK_UP_SYM_H1: i32 = 0;
+static mut A_B_LOOK_UP_SYM_H2: i32 = 0;
 
 
 fn main() {
@@ -1099,12 +1434,14 @@ fn main() {
     assert_ne!(GameResult::InProgress < GameResult::Draw, true);
     let mut game = Game::new(3);
     let game1 = Game::new(3);
-    let game2 = Game::new(3);
+    let game2 = Game::new(4);
     let game3 = Game::new(3);
     let alfa = GameResult::Player(Player::O);
     let beta = GameResult::Player(Player::X);
 
-    let first_min_max = min_max(&mut game.board.clone(), 10,game.board.player_turn);
+    let first_min_max = min_max(&mut game3.board.clone(), 10,game.board.player_turn);
+
+    println!("Min-Max:");
 
     let mut look_up_change = HashMap::new();
     let first_min_max_lookup = min_max_lookup(&mut game1.board.clone(), 10,game.board.player_turn, &mut look_up_change);
@@ -1123,7 +1460,7 @@ fn main() {
         println!("{:?}", COUNTERLOOK);
     }
 
-    let first_alfa_beta = alpha_beta(&mut game1.board.clone(), 10, alfa, beta, game.board.player_turn);
+    let first_alfa_beta = alpha_beta(&mut game3.board.clone(), 10, alfa, beta, game.board.player_turn);
 
     println!("AB:");
 
@@ -1137,7 +1474,7 @@ fn main() {
 
     let alfa1 = GameResult::Player(Player::O);
     let beta1 = GameResult::Player(Player::X);
-    let first_alfa_beta_h1 = alpha_beta_h1(&mut game1.board.clone(), 10, alfa1, beta1, game.board.player_turn);
+    let first_alfa_beta_h1 = alpha_beta_h1(&mut game3.board.clone(), 10, alfa1, beta1, game.board.player_turn);
 
     println!("ABH1:");
 
@@ -1151,7 +1488,7 @@ fn main() {
     println!("AB Lookup:");
     let mut look_up_ab = HashMap::new();
 
-    let first_look_ab = alpha_beta_lookup(&mut game3.board.clone(), 10, alfa, beta, game.board.player_turn, &mut look_up_ab);
+    let first_look_ab = alpha_beta_lookup(&mut game2.board.clone(), 10, alfa, beta, game.board.player_turn, &mut look_up_ab.clone());
 
     println!("{:?}", first_look_ab.result);
     println!("{:?}", first_look_ab.time);
@@ -1163,13 +1500,33 @@ fn main() {
     println!("AB Lookup Sym:");
     let mut look_up_ab_sym = HashMap::new();
 
-    let first_look_ab_sym = alpha_beta_lookup_sym(&mut game2.board.clone(), 10, alfa, beta, game.board.player_turn, &mut look_up_ab_sym);
+    let first_look_ab_sym = alpha_beta_lookup_sym(&mut game2.board.clone(), 10, alfa, beta, game.board.player_turn, &mut look_up_ab_sym.clone());
 
     println!("{:?}", first_look_ab_sym.result);
     println!("{:?}", first_look_ab_sym.time);
 
     unsafe {
         println!("{:?}", A_B_LOOK_UP_SYM);
+    }
+
+    println!("AB Lookup Sym h1:");
+    let first_look_ab_sym_h1 = alpha_beta_lookup_sym_h1(&mut game2.board.clone(), 10, alfa, beta, game.board.player_turn, &mut look_up_ab_sym.clone());
+
+    println!("{:?}", first_look_ab_sym_h1.result);
+    println!("{:?}", first_look_ab_sym_h1.time);
+
+    unsafe {
+        println!("{:?}", A_B_LOOK_UP_SYM_H1);
+    }
+
+    println!("AB Lookup Sym h2:");
+    let first_look_ab_sym_h2 = alpha_beta_lookup_sym_h2(&mut game2.board.clone(), 10, alfa, beta, game.board.player_turn, &mut look_up_ab_sym.clone());
+
+    println!("{:?}", first_look_ab_sym_h2.result);
+    println!("{:?}", first_look_ab_sym_h2.time);
+
+    unsafe {
+        println!("{:?}", A_B_LOOK_UP_SYM_H2);
     }
 
     game.play();

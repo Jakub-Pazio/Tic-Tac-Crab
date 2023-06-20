@@ -529,16 +529,17 @@ impl Board {
     fn find_best_move_alfa_beta(&self) -> u32 {
         let alfa = GameResult::Player(Player::O);
         let beta = GameResult::Player(Player::X);
+        let mut lookup = HashMap::new();
         match self.player_turn {
             Player::X => {
                 let mut best_move = self.generate_moves()[0].clone(); // I'll get int at the end!
-                let mut best_move_score = alpha_beta(&mut best_move, 10, alfa, beta, Player::O);
+                let mut best_move_score = alpha_beta_lookup_h1(&mut best_move, 10, alfa, beta, Player::O, &mut lookup);
                 for legal_board in self.generate_moves() {
-                    if alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::O).result
+                    if alpha_beta_lookup_h1(&mut legal_board.clone(), 10, alfa, beta, Player::O, &mut lookup).result
                         > best_move_score.result
                     {
                         best_move_score =
-                            alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::O);
+                            alpha_beta_lookup_h1(&mut legal_board.clone(), 10, alfa, beta, Player::O, &mut lookup);
                         best_move = legal_board;
                     }
                 }
@@ -547,13 +548,13 @@ impl Board {
             Player::O => {
                 // Do the same but just flip grater sign i guess ?
                 let mut best_move = self.generate_moves()[0].clone();
-                let mut best_move_score = alpha_beta(&mut best_move, 10, alfa, beta, Player::X);
+                let mut best_move_score = alpha_beta_lookup_h1(&mut best_move, 10, alfa, beta, Player::X, &mut lookup);
                 for legal_board in self.generate_moves() {
-                    if alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::X).result
+                    if alpha_beta_lookup_h1(&mut legal_board.clone(), 10, alfa, beta, Player::X, &mut lookup).result
                         < best_move_score.result
                     {
                         best_move_score =
-                            alpha_beta(&mut legal_board.clone(), 10, alfa, beta, Player::X);
+                            alpha_beta_lookup_h1(&mut legal_board.clone(), 10, alfa, beta, Player::X, &mut lookup);
                         best_move = legal_board;
                     }
                 }
@@ -1429,7 +1430,7 @@ impl Game {
                 _ => {}
             }
             //println!("{:?}", self.board.generate_sorted_lines_heuristic());
-            self.human_move();
+            self.make_best_move_a_b();
             println!("{:?}", self.board);
             println!("{:?}", self.board.lines_heuristic(Player::O));
             self.winner = self.board.get_result();
@@ -1465,7 +1466,7 @@ fn main() {
     assert_ne!(GameResult::InProgress > GameResult::Draw, true);
     assert_ne!(GameResult::InProgress < GameResult::Draw, true);
     let mut game = Game::new(3);
-    let game1 = Game::new(4);
+    let mut game1 = Game::new(4);
 
     let alfa = GameResult::Player(Player::O);
     let beta = GameResult::Player(Player::X);
@@ -1687,5 +1688,5 @@ fn main() {
         COUNTER = 0;
     }
 
-    game.play();
+    game1.play();
 }
